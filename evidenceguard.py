@@ -62,7 +62,11 @@ def fingerprint(path):
         after = os.fstat(handle.fileno())
     current = path.lstat()
     def identity(s):
-        return (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns, s.st_mode)
+        # Windows can report different ctime/mode values for path and handle
+        # stat calls even when the file is unchanged. Size and mtime are
+        # portable; device/inode add replacement detection on POSIX.
+        portable = (s.st_size, s.st_mtime_ns)
+        return portable if os.name == "nt" else (s.st_dev, s.st_ino, *portable)
     if identity(before) != identity(after) or identity(after) != identity(current):
         raise ValueError("file changed during scan; retry on a stable copy")
     return {"sha256": digest.hexdigest(), "size": after.st_size,
