@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+demo-output/
+baseline.json
+report.json
+report.html
