@@ -4,7 +4,16 @@
 
 EvidenceGuard records a SHA-256 baseline of a known-good directory and compares later copies against it. It helps an analyst identify changed configuration files, missing logs, unexpected additions, and permission changes without uploading file contents to a service.
 
-Built with Python 3.10+ and the standard library. No installation, API key, administrator access, or external dependencies are required.
+Built with Python 3.10+ and the standard library. No API key, administrator access, or external runtime dependencies are required.
+
+## Installation
+
+Run directly from the repository, or install the command locally:
+
+```sh
+python -m pip install -e .
+evidenceguard --help
+```
 
 ## Quick start
 
@@ -89,13 +98,14 @@ python -m unittest discover -s tests -v
 python demo.py
 ```
 
-The test suite covers content and permission changes, tampering, exclusions, symlink replacement, error reporting, invalid baselines, report escaping, relocation, and CLI exit codes. GitHub Actions is configured to run it on Ubuntu and Windows across Python 3.10, 3.12, and 3.13. POSIX-only tests are skipped on Windows.
+The test suite covers content and permission changes, baseline and ledger tampering, exclusions, symlink replacement, error reporting, invalid baselines, report escaping, relocation, and end-to-end CLI behavior. GitHub Actions is configured to run it on Ubuntu and Windows across Python 3.10, 3.12, and 3.13. POSIX-only tests are skipped on Windows.
 
 ## Project files
 
 - `evidenceguard.py`: scanner, baseline validation, comparison, reports, and CLI.
 - `demo.py`: self-contained synthetic demonstration.
-- `tests/test_evidenceguard.py`: automated regression tests.
-- `.github/workflows/tests.yml`: CI configuration.
+- `tests/test_evidenceguard.py`: automated regression and CLI tests.
+- `pyproject.toml`: installable package metadata and the `evidenceguard` command.
+- `.github/workflows/tests.yml`: Linux/Windows CI configuration.
 
 Author: Hassan Ali. Licensed under the MIT License.

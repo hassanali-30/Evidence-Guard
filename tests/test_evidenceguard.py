@@ -160,10 +160,6 @@ class IntegrityTests(unittest.TestCase):
         self.assertIn("EvidenceGuard", html.read_text())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_tamper_evident_ledger(self):
         self.create()
         report = eg.compare(json.loads(self.baseline.read_text()), eg.scan(self.root, []))
@@ -181,3 +177,24 @@ if __name__ == "__main__":
         ledger.write_text("\n".join(lines) + "\n")
         with self.assertRaises(ValueError):
             eg.verify_ledger(ledger)
+
+    def test_ledger_cli(self):
+        report = self.base / "report.json"
+        ledger = self.base / "ledger.jsonl"
+        report.write_text(json.dumps({"status": "clean", "root": str(self.root)}))
+        append = subprocess.run(
+            [sys.executable, str(Path(eg.__file__)), "ledger", "append",
+             str(report), "--output", str(ledger)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(append.returncode, 0, append.stderr)
+        verify = subprocess.run(
+            [sys.executable, str(Path(eg.__file__)), "ledger", "verify", str(ledger)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(verify.returncode, 0, verify.stderr)
+        self.assertEqual(json.loads(verify.stdout)["records"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

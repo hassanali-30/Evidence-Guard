@@ -22,8 +22,14 @@ def main():
         report = eg.compare(saved, eg.scan(root, []))
         eg.atomic_write(output / "report.json", eg.encode(report))
         eg.atomic_write(output / "report.html", eg.render_html(report).encode())
-        print(f"Demo complete: {len(report['changes'])} changes. Open {output / 'report.html'}")
-        return 0 if len(report["changes"]) == 3 else 2
+        record_sha256 = eg.append_ledger(output / "ledger.jsonl", report)
+        ledger = eg.verify_ledger(output / "ledger.jsonl")
+        print(
+            f"Demo complete: {len(report['changes'])} changes. "
+            f"Ledger records: {ledger['records']}. Open {output / 'report.html'}"
+        )
+        valid = len(report["changes"]) == 3 and ledger["last_sha256"] == record_sha256
+        return 0 if valid else 2
 
 
 if __name__ == "__main__":
