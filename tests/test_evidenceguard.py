@@ -167,8 +167,10 @@ class IntegrityTests(unittest.TestCase):
         first = eg.append_ledger(ledger, report)
         report["status"] = "changed"
         second = eg.append_ledger(ledger, report)
-        verified = eg.verify_ledger(ledger)
+        verified = eg.verify_ledger(ledger, second)
         self.assertEqual(verified, {"records": 2, "last_sha256": second})
+        with self.assertRaises(ValueError):
+            eg.verify_ledger(ledger, "0" * 64)
         self.assertNotEqual(first, second)
         lines = ledger.read_text().splitlines()
         tampered = json.loads(lines[0])
@@ -193,7 +195,22 @@ class IntegrityTests(unittest.TestCase):
             capture_output=True, text=True,
         )
         self.assertEqual(verify.returncode, 0, verify.stderr)
+        append_result = json.loads(append.stdout)
+        anchored = subprocess.run(
+            [sys.executable, str(Path(eg.__file__)), "ledger", "verify", str(ledger),
+             "--expected-digest", append_result["record_sha256"]],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(anchored.returncode, 0, anchored.stderr)
         self.assertEqual(json.loads(verify.stdout)["records"], 1)
+
+    def test_append_repairs_missing_trailing_newline(self):
+        ledger = self.base / "ledger.jsonl"
+        report = {"status": "clean", "root": str(self.root)}
+        eg.append_ledger(ledger, report)
+        ledger.write_bytes(ledger.read_bytes().rstrip(b"\n"))
+        last = eg.append_ledger(ledger, report)
+        self.assertEqual(eg.verify_ledger(ledger, last)["records"], 2)
 
 
 if __name__ == "__main__":

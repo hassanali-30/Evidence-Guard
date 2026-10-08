@@ -32,6 +32,7 @@ python evidenceguard.py baseline ./evidence --output ./baseline.json
 python evidenceguard.py check ./baseline.json --json ./report.json --html ./report.html
 python evidenceguard.py ledger append ./report.json --output ./ledger.jsonl
 python evidenceguard.py ledger verify ./ledger.jsonl
+python evidenceguard.py ledger verify ./ledger.jsonl --expected-digest TRUSTED_LAST_RECORD_SHA256
 ```
 
 Create `./evidence` and put the authorized files you want to monitor inside it first. Store the baseline and reports **outside** that directory. On systems where Python is named `python3`, use that command instead.
@@ -59,6 +60,8 @@ python evidenceguard.py check baseline.json --expected-digest YOUR_TRUSTED_SHA25
 ```
 
 Replace `YOUR_TRUSTED_SHA256` with the printed 64-character digest. A digest stored beside an editable baseline is not protection against an attacker who can replace both. The tool does not digitally sign evidence or provide a legally certified chain of custody.
+
+The ledger append command likewise prints a `record_sha256`. Preserve the latest value separately and pass it to `ledger verify --expected-digest` to anchor the chain. Without that external value, internal hash links detect ordinary edits but cannot prove that an attacker did not replace and recompute the complete ledger.
 
 ## Exclusions and relocated copies
 

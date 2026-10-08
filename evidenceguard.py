@@ -133,13 +133,15 @@ def append_ledger(path, report):
     payload = _ledger_payload(report, previous_sha256)
     record = {**payload, "record_sha256": sha256(encode(payload))}
     existing = ledger_path.read_bytes() if ledger_path.exists() else b""
+    if existing and not existing.endswith(b"\n"):
+        existing += b"\n"
     line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     atomic_write(ledger_path, existing + line)
     return record["record_sha256"]
 
 
-def verify_ledger(path):
-    """Verify record hashes and links in a ledger."""
+def verify_ledger(path, expected_digest=None):
+    """Verify record hashes and links, optionally against a trusted last hash."""
     records = []
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         if line.strip():
@@ -155,6 +157,10 @@ def verify_ledger(path):
         if record.get("previous_sha256") != previous_sha256 or sha256(encode(payload)) != actual:
             raise ValueError("ledger integrity check failed")
         previous_sha256 = actual
+    if expected_digest is not None:
+        expected = expected_digest.lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", expected) or previous_sha256 != expected:
+            raise ValueError("ledger digest does not match the trusted digest")
     return {"records": len(records), "last_sha256": previous_sha256}
 
 
@@ -249,6 +255,7 @@ def main(argv=None):
     append.add_argument("--output", required=True)
     verify = ledger_sub.add_parser("verify", help="verify ledger hashes and links")
     verify.add_argument("path")
+    verify.add_argument("--expected-digest", help="trusted SHA-256 of the final ledger record")
     check = sub.add_parser("check", help="compare a directory against a baseline")
     check.add_argument("baseline")
     check.add_argument("--root", help="explicitly check a relocated copy")
@@ -265,7 +272,7 @@ def main(argv=None):
                 record_sha256 = append_ledger(args.output, report)
                 print(json.dumps({"ledger": args.output, "record_sha256": record_sha256}))
                 return 0
-            print(json.dumps(verify_ledger(args.path)))
+            print(json.dumps(verify_ledger(args.path, args.expected_digest)))
             return 0
         if args.command == "baseline":
             ensure_outside(args.root, [args.output])
