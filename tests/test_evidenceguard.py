@@ -162,3 +162,22 @@ class IntegrityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_tamper_evident_ledger(self):
+        self.create()
+        report = eg.compare(json.loads(self.baseline.read_text()), eg.scan(self.root, []))
+        ledger = self.base / "ledger.jsonl"
+        first = eg.append_ledger(ledger, report)
+        report["status"] = "changed"
+        second = eg.append_ledger(ledger, report)
+        verified = eg.verify_ledger(ledger)
+        self.assertEqual(verified, {"records": 2, "last_sha256": second})
+        self.assertNotEqual(first, second)
+        lines = ledger.read_text().splitlines()
+        tampered = json.loads(lines[0])
+        tampered["status"] = "changed"
+        lines[0] = json.dumps(tampered)
+        ledger.write_text("\n".join(lines) + "\n")
+        with self.assertRaises(ValueError):
+            eg.verify_ledger(ledger)

@@ -21,6 +21,8 @@ To check your own directory:
 ```sh
 python evidenceguard.py baseline ./evidence --output ./baseline.json
 python evidenceguard.py check ./baseline.json --json ./report.json --html ./report.html
+python evidenceguard.py ledger append ./report.json --output ./ledger.jsonl
+python evidenceguard.py ledger verify ./ledger.jsonl
 ```
 
 Create `./evidence` and put the authorized files you want to monitor inside it first. Store the baseline and reports **outside** that directory. On systems where Python is named `python3`, use that command instead.
@@ -34,6 +36,7 @@ Create `./evidence` and put the authorized files you want to monitor inside it f
 | Incomplete scans | Read failures and unverified paths are reported explicitly |
 | Reports | Machine-readable JSON and an offline HTML summary with escaped filenames |
 | Baseline protection | Explicit overwrite flag and optional verification against a separately stored digest |
+| Evidence ledger | Append-only hash chaining for report summaries, with an offline verification command |
 | Exclusions | Repeatable shell-style patterns saved in the baseline |
 | Automation | Exit codes for clean, changed, or incomplete scans |
 | Portability | Standard-library implementation; Windows and Linux CI configuration |

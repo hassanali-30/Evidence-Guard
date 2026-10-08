@@ -109,6 +109,55 @@ def scan(root, excludes):
             "skipped": skipped, "errors": errors}
 
 
+def _ledger_payload(report, previous_sha256):
+    return {
+        "schema_version": 1,
+        "created_at": utc_now(),
+        "previous_sha256": previous_sha256,
+        "report_sha256": sha256(encode(report)),
+        "status": report.get("status"),
+        "root": report.get("root"),
+    }
+
+
+def append_ledger(path, report):
+    """Append a chained, tamper-evident summary of a verification report."""
+    ledger_path = Path(path)
+    records = []
+    if ledger_path.exists():
+        for line in ledger_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                records.append(json.loads(line))
+        verify_ledger(ledger_path)
+    previous_sha256 = records[-1]["record_sha256"] if records else ""
+    payload = _ledger_payload(report, previous_sha256)
+    record = {**payload, "record_sha256": sha256(encode(payload))}
+    existing = ledger_path.read_bytes() if ledger_path.exists() else b""
+    line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    atomic_write(ledger_path, existing + line)
+    return record["record_sha256"]
+
+
+def verify_ledger(path):
+    """Verify record hashes and links in a ledger."""
+    records = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            record = json.loads(line)
+            if not isinstance(record, dict) or not isinstance(record.get("record_sha256"), str):
+                raise ValueError("invalid ledger record")
+            records.append(record)
+    previous_sha256 = ""
+    for record in records:
+        actual = record["record_sha256"]
+        payload = dict(record)
+        payload.pop("record_sha256", None)
+        if record.get("previous_sha256") != previous_sha256 or sha256(encode(payload)) != actual:
+            raise ValueError("ledger integrity check failed")
+        previous_sha256 = actual
+    return {"records": len(records), "last_sha256": previous_sha256}
+
+
 def load_baseline(path, expected_digest=None):
     data = Path(path).read_bytes()
     if expected_digest and sha256(data) != expected_digest.lower():
@@ -193,6 +242,13 @@ def main(argv=None):
     baseline.add_argument("--output", required=True)
     baseline.add_argument("--exclude", action="append", default=[])
     baseline.add_argument("--force", action="store_true", help="replace an existing baseline deliberately")
+    ledger = sub.add_parser("ledger", help="append or verify chained report records")
+    ledger_sub = ledger.add_subparsers(dest="ledger_command", required=True)
+    append = ledger_sub.add_parser("append", help="append a report summary")
+    append.add_argument("report")
+    append.add_argument("--output", required=True)
+    verify = ledger_sub.add_parser("verify", help="verify ledger hashes and links")
+    verify.add_argument("path")
     check = sub.add_parser("check", help="compare a directory against a baseline")
     check.add_argument("baseline")
     check.add_argument("--root", help="explicitly check a relocated copy")
@@ -201,6 +257,16 @@ def main(argv=None):
     check.add_argument("--html", dest="html_output")
     args = parser.parse_args(argv)
     try:
+        if args.command == "ledger":
+            if args.ledger_command == "append":
+                report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+                if not isinstance(report, dict):
+                    raise ValueError("report must be a JSON object")
+                record_sha256 = append_ledger(args.output, report)
+                print(json.dumps({"ledger": args.output, "record_sha256": record_sha256}))
+                return 0
+            print(json.dumps(verify_ledger(args.path)))
+            return 0
         if args.command == "baseline":
             ensure_outside(args.root, [args.output])
             if Path(args.output).exists() and not args.force:
