@@ -98,7 +98,7 @@ class IntegrityTests(unittest.TestCase):
         original_fingerprint = eg.fingerprint
 
         def fingerprint_except_unreadable(path):
-            if path == unreadable:
+            if path.name == unreadable.name:
                 raise PermissionError("denied")
             return original_fingerprint(path)
 
