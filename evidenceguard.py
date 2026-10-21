@@ -191,17 +191,27 @@ def load_baseline(path, expected_digest=None):
 def compare(baseline, current):
     changes = []
     old, new = baseline["files"], current["files"]
-    skipped = {entry["path"]: entry["reason"] for entry in current["skipped"]}
+
+    def affected_by(entries, path):
+        for entry in entries:
+            affected = entry.get("path")
+            if affected in ("", "."):
+                return True
+            if isinstance(affected, str) and (
+                    path == affected or path.startswith(affected.rstrip("/") + "/")):
+                return True
+        return False
+
     for path in sorted(old.keys() | new.keys()):
         before, after = old.get(path), new.get(path)
         kind = None
         if before is None:
             kind = "added"
         elif after is None:
-            # A scan error makes absence uncertain; never report it as deletion.
-            kind = "unverified" if current["errors"] else "deleted"
-            if any(path == p or path.startswith(p + "/") for p in skipped):
-                kind = "unverified"
+            uncertain = affected_by(current["errors"], path) or affected_by(
+                current["skipped"], path
+            )
+            kind = "unverified" if uncertain else "deleted"
         elif before["sha256"] != after["sha256"] or before["size"] != after["size"]:
             kind = "modified"
         elif before["mode"] != after["mode"]:

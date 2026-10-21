@@ -88,6 +88,28 @@ class IntegrityTests(unittest.TestCase):
         self.assertEqual(report["status"], "incomplete")
         self.assertEqual(report["changes"][0]["change"], "unverified")
 
+    def test_unrelated_scan_error_does_not_hide_confirmed_deletion(self):
+        unreadable = self.root / "unreadable.txt"
+        deleted = self.root / "deleted.txt"
+        unreadable.write_text("protected\n")
+        deleted.write_text("remove me\n")
+        old = self.create()
+        deleted.unlink()
+        original_fingerprint = eg.fingerprint
+
+        def fingerprint_except_unreadable(path):
+            if path == unreadable:
+                raise PermissionError("denied")
+            return original_fingerprint(path)
+
+        with patch.object(eg, "fingerprint", side_effect=fingerprint_except_unreadable):
+            report = eg.compare(old, eg.scan(self.root, []))
+
+        changes = {item["path"]: item["change"] for item in report["changes"]}
+        self.assertEqual(changes["unreadable.txt"], "unverified")
+        self.assertEqual(changes["deleted.txt"], "deleted")
+        self.assertEqual(report["status"], "incomplete")
+
     def test_failed_baseline_not_written(self):
         with patch.object(eg, "fingerprint", side_effect=PermissionError("denied")):
             self.assertEqual(self.call("baseline", self.root, "--output", self.baseline), 2)
